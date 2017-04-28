@@ -18,6 +18,7 @@ if __name__ == '__main__':
                                partial(path.join, get_python_lib(prefix=''), package_name, *paths))
 
     _data_join, _data_install_dir = to_funcs('_data')
+    conf_join, conf_install_dir = to_funcs('conf')
 
     setup(
         name=package_name,
@@ -27,5 +28,7 @@ if __name__ == '__main__':
         packages=find_packages(),
         package_dir={package_name: package_name},
         data_files=[
-            (_data_install_dir(), map(_data_join, listdir(_data_join())))]
+            (_data_install_dir(), map(_data_join, listdir(_data_join()))),
+            (conf_install_dir(), map(conf_join, listdir(conf_join())))
+        ]
     )
