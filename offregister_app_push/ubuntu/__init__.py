@@ -2,9 +2,6 @@ from cStringIO import StringIO
 from itertools import imap, chain
 from sys import modules
 from functools import partial
-
-from offregister_fab_utils.ubuntu.systemd import restart_systemd
-from offutils import it_consumes, pp
 from pkg_resources import resource_filename
 from os import path
 
@@ -12,12 +9,17 @@ from fabric.operations import run, _run_command, sudo, put, get
 from fabric.contrib.files import exists, upload_template, append
 from fabric.context_managers import cd, shell_env
 
+from offregister_fab_utils.ubuntu.systemd import restart_systemd, install_upgrade_service
+
+from offutils import it_consumes
+
 from offregister_fab_utils.apt import apt_depends
 from offregister_fab_utils.fs import cmd_avail
 from offregister_fab_utils.git import clone_or_update
 
-from offregister_app_push import get_logger
 from offregister_node.ubuntu import install_node0, install_global_npm_packages1
+
+from offregister_app_push import get_logger
 
 logger = get_logger(modules[__name__].__name__)
 
@@ -242,13 +244,11 @@ def _nginx_cerbot_setup(domains, https_cert_email, conf_dirs=('/etc/nginx/sites-
 
 
 def _install_upgrade_service(service_name, **kwargs):
-    conf_local_filepath = kwargs.get('systemd-conf-file',
-                                     resource_filename('offregister_app_push', path.join('conf', 'systemd.conf')))
-    conf_remote_filename = '/lib/systemd/system/{service_name}.service'.format(service_name=service_name)
-    upload_template(conf_local_filepath, conf_remote_filename,
-                    context={'ExecStart': kwargs['ExecStart'], 'Environments': kwargs['Environments'],
-                             'WorkingDirectory': kwargs['WorkingDirectory'],
-                             'User': kwargs['User'], 'Group': kwargs['Group'],
-                             'service_name': service_name},
-                    use_sudo=True, backup=False)
+    install_upgrade_service(service_name,
+                            conf_local_filepath=kwargs.get('systemd-conf-file'),
+                            context={
+                                'ExecStart': kwargs['ExecStart'], 'Environments': kwargs['Environments'],
+                                'WorkingDirectory': kwargs['WorkingDirectory'],
+                                'User': kwargs['User'], 'Group': kwargs['Group'],
+                                'service_name': service_name})
     return restart_systemd(service_name)
