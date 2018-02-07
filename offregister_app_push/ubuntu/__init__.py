@@ -49,7 +49,7 @@ def push0(**kwargs):
                 elif exists('/tmp/node_modules'):
                     run_cmd('cp -r /tmp/node_modules "{nm}"'.format(nm=nm))
                     run_cmd('rm -rf /tmp/node_modules')
-                run_cmd('npm i')
+                run_cmd('npm i --unsafe-perm=true')
                 if exists('typings.json'):
                     if cmd_avail('typings'):
                         run_cmd('rm -rf typings')
@@ -83,6 +83,10 @@ def _indent(text, amount, ch=' '):
 def nginx1(*args, **kwargs):
     if not kwargs['nginx']:
         return 'skipping nginx'
+
+    if not cmd_avail('nginx'):
+        sudo('add-apt-repository -y ppa:nginx/stable')
+        apt_depends('nginx')
 
     # TODO: Move this to an nginx module; usable by other `offregister-` packages
 
