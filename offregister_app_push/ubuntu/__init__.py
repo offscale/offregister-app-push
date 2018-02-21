@@ -35,44 +35,66 @@ def push0(**kwargs):
     clone_or_update(repo=kwargs['GIT_REPO'], to_dir=kwargs['GIT_DIR'], use_sudo=kwargs.get('use_sudo', False),
                     branch=kwargs.get('GIT_BRANCH', 'master'), skip_reset=kwargs.get('skip_reset', False))
     run_cmd = partial(_run_command, sudo=kwargs.get('use_sudo', False))
+    user = run_cmd('echo $USER', quiet=True)
+    nonroot = run('echo $USER', quiet=True)
     run_cmd('mkdir -p \'{GIT_DIR}\''.format(GIT_DIR=kwargs['GIT_DIR']))
+
     if not exists('$HOME/n/bin'):
         install_node0(node_version=kwargs.get('node_version'), use_sudo=False, node_sudo=False)
     with cd(kwargs['GIT_DIR']), shell_env(PATH='$HOME/n/bin:$PATH'):
         if exists('package.json'):
-            if cmd_avail('npm'):
-                install_global_npm_packages1(npm_global_packages=kwargs.get('npm_global_packages'),
-                                             use_sudo=False, node_sudo=False)
-
-                if destroy_node_modules:
-                    run_cmd('rm -rf node_modules')
-                elif exists('/tmp/node_modules'):
-                    run_cmd('cp -r /tmp/node_modules "{nm}"'.format(nm=nm))
-                    run_cmd('rm -rf /tmp/node_modules')
-                run_cmd('npm i --unsafe-perm=true')
-                if exists('typings.json'):
-                    if cmd_avail('typings'):
-                        run_cmd('rm -rf typings')
-                        run_cmd('typings i')
-                    else:
-                        logger.warn('typings not installed; skipping')
-                if kwargs.get('post_npm_step'):
-                    run_cmd(kwargs['post_npm_step'])
-                home_dir = run('echo $HOME', quiet=True)
-                curr_dir = run('echo "${PWD##*/}"')
-                rdbms_uri = run('echo "$RDBMS_URI"')
-                kwargs['Environments'] = '{}\n'.format(kwargs['Environments']) if 'Environments' in kwargs else ''
-                kwargs['Environments'] += 'Environment=RDBMS_URI={rdbms_uri}\n' \
-                                          'Environment=PORT={port}\n'.format(rdbms_uri=rdbms_uri,
-                                                                             port=kwargs['REST_API_PORT'])
-                kwargs['WorkingDirectory'] = kwargs['GIT_DIR']
-                kwargs['ExecStart'] = kwargs['ExecStart'].format(home_dir=home_dir)
-                kwargs['service_name'] = curr_dir
-                kwargs['User'] = kwargs['User'] if 'User' in kwargs else 'root'
-                kwargs['Group'] = kwargs['Group'] if 'Group' in kwargs else 'root'
-                _install_upgrade_service(**kwargs)
-            else:
+            if not cmd_avail('npm'):
                 logger.warn('npm not installed; skipping')
+                return
+
+            npm_tmp = run_cmd('echo $HOME/.npm/_cacache/tmp', quiet=True)
+            install_global_npm_packages1(npm_global_packages=kwargs.get('npm_global_packages'),
+                                         use_sudo=False, node_sudo=False)
+
+            if destroy_node_modules:
+                run_cmd('rm -rf node_modules')
+            elif exists('/tmp/node_modules'):
+                run_cmd('cp -r /tmp/node_modules "{nm}"'.format(nm=nm))
+                run_cmd('rm -rf /tmp/node_modules')
+
+            if run_cmd('npm i --unsafe-perm=true', warn_only=True).failed:
+                # sudo('chown -R {user} {npm_tmp}'.format(user=user, npm_tmp=npm_tmp))
+                run_cmd('echo chown -R {u} {s} {d}'.format(u=nonroot, d='{}/node_modules'.format(kwargs['GIT_DIR']),
+                                                           s='$(npm config get prefix)/{lib/node_modules,bin,share}'))
+                run_cmd('chown -R {u} {s} {d}'.format(u=nonroot, d='{}/node_modules'.format(kwargs['GIT_DIR']),
+                                                      s='$(npm config get prefix)/{lib/node_modules,bin,share}'))
+                print 'user =', user, ';'
+                sudo('npm i --unsafe-perm=true', user=nonroot)
+            if exists('typings.json'):
+                if cmd_avail('typings'):
+                    run_cmd('rm -rf typings')
+                    run_cmd('typings i')
+                else:
+                    logger.warn('typings not installed; skipping')
+            if kwargs.get('post_npm_step'):
+                run_cmd(kwargs['post_npm_step'])
+
+            sudo('rm -rf {npm_tmp}'.format(npm_tmp=npm_tmp))
+
+            home_dir = run('echo $HOME', quiet=True)
+            curr_dir = run('echo "${PWD##*/}"')
+
+            if kwargs['RDBMS_URI']:
+                rdbms_uri = kwargs['RDBMS_URI'] if isinstance(kwargs['RDBMS_URI'], basestring) \
+                    else ''.join(imap(str, kwargs['RDBMS_URI']))
+            else:
+                rdbms_uri = run('echo "$RDBMS_URI"')
+
+            kwargs['Environments'] = '{}\n'.format(kwargs['Environments']) if 'Environments' in kwargs else ''
+            kwargs['Environments'] += 'Environment=RDBMS_URI={rdbms_uri}\n' \
+                                      'Environment=PORT={port}\n'.format(rdbms_uri=rdbms_uri,
+                                                                         port=kwargs['REST_API_PORT'])
+            kwargs['WorkingDirectory'] = kwargs['GIT_DIR']
+            kwargs['ExecStart'] = kwargs['ExecStart'].format(home_dir=home_dir)
+            kwargs['service_name'] = curr_dir
+            kwargs['User'] = kwargs['User'] if 'User' in kwargs else 'root'
+            kwargs['Group'] = kwargs['Group'] if 'Group' in kwargs else 'root'
+            _install_upgrade_service(**kwargs)
 
 
 def _indent(text, amount, ch=' '):
@@ -107,6 +129,7 @@ def nginx1(*args, **kwargs):
 
 
 def _send_nginx_conf(conf_remote_filename, proxy_block_local_filepath, sites_avail_local_filepath, conf_vars):
+    print '_send_nginx_conf', conf_remote_filename, proxy_block_local_filepath, sites_avail_local_filepath, conf_vars, ';'
     context = {'NGINX_PORT': conf_vars['NGINX_PORT'],
                'DNS_NAMES': ' '.join(conf_vars['DNS_NAMES']),
                'DESCRIPTION': conf_vars['DESCRIPTION'],
