@@ -91,6 +91,12 @@ def push0(**kwargs):
                                                                          port=kwargs['REST_API_PORT'])
             if 'DAEMON_ENV' in kwargs and kwargs['DAEMON_ENV']:
                 kwargs['Environments'] += '\nEnvironment='.join(kwargs['DAEMON_ENV'])
+                if "$$ENV_JSON_FILE" in kwargs['DAEMON_ENV']:
+                    apt_depends('jq')
+                    kwargs['Environments'] += run(
+                        'jq -r "to_entries|map(\"Environment=\(.key)=\(.value|tostring)\")|.[]" {}'.format(kwargs['DAEMON_ENV']['$$ENV_JSON_FILE']),
+                        shell_escape=False
+                    )
             kwargs['WorkingDirectory'] = kwargs['GIT_DIR']
             kwargs['ExecStart'] = kwargs['ExecStart'].format(home_dir=home_dir)
             kwargs['service_name'] = curr_dir
