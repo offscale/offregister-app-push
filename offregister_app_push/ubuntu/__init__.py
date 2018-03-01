@@ -89,6 +89,8 @@ def push0(**kwargs):
             kwargs['Environments'] += 'Environment=RDBMS_URI={rdbms_uri}\n' \
                                       'Environment=PORT={port}\n'.format(rdbms_uri=rdbms_uri,
                                                                          port=kwargs['REST_API_PORT'])
+            if 'DAEMON_ENV' in kwargs and kwargs['DAEMON_ENV']:
+                kwargs['Environments'] += '\nEnvironment='.join(kwargs['DAEMON_ENV'])
             kwargs['WorkingDirectory'] = kwargs['GIT_DIR']
             kwargs['ExecStart'] = kwargs['ExecStart'].format(home_dir=home_dir)
             kwargs['service_name'] = curr_dir
