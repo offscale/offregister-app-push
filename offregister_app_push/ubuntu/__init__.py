@@ -90,12 +90,15 @@ def push0(**kwargs):
                                       'Environment=PORT={port}\n'.format(rdbms_uri=rdbms_uri,
                                                                          port=kwargs['REST_API_PORT'])
             if 'DAEMON_ENV' in kwargs and kwargs['DAEMON_ENV']:
-                kwargs['Environments'] += '\nEnvironment='.join(kwargs['DAEMON_ENV'])
+                kwargs['Environments'] += '\n'.join('Environment={k}={v}'.format(k=k, v=v)
+                                                    for k, v in kwargs['DAEMON_ENV'].iteritems()
+                                                    if not k.startswith('$$'))
                 if "$$ENV_JSON_FILE" in kwargs['DAEMON_ENV']:
-                    apt_depends('jq')
-                    kwargs['Environments'] += run(
-                        'jq -r "to_entries|map(\"Environment=\(.key)=\(.value|tostring)\")|.[]" {}'.format(kwargs['DAEMON_ENV']['$$ENV_JSON_FILE']),
-                        shell_escape=False
+                    kwargs['Environments'] += '\n' + run(
+                        "node -e 'e=require(" + '`{fname}`'.format(
+                            fname=kwargs['DAEMON_ENV']['$$ENV_JSON_FILE']
+                        ) + "); Object.keys(e).forEach(k => k.startsWith('$$') || console.info(`Environment=${k}=${e[k]}`))'",
+                        shell_escape=False, shell=False
                     )
             kwargs['WorkingDirectory'] = kwargs['GIT_DIR']
             kwargs['ExecStart'] = kwargs['ExecStart'].format(home_dir=home_dir)
