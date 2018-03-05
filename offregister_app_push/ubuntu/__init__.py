@@ -59,11 +59,8 @@ def push0(**kwargs):
 
             if run_cmd('npm i --unsafe-perm=true', warn_only=True).failed:
                 # sudo('chown -R {user} {npm_tmp}'.format(user=user, npm_tmp=npm_tmp))
-                run_cmd('echo chown -R {u} {s} {d}'.format(u=nonroot, d='{}/node_modules'.format(kwargs['GIT_DIR']),
-                                                           s='$(npm config get prefix)/{lib/node_modules,bin,share}'))
-                run_cmd('chown -R {u} {s} {d}'.format(u=nonroot, d='{}/node_modules'.format(kwargs['GIT_DIR']),
-                                                      s='$(npm config get prefix)/{lib/node_modules,bin,share}'))
-                print 'user =', user, ';'
+                run_cmd('chown -R {u} {d} {s}'.format(u=nonroot, d=kwargs['GIT_DIR'],
+                                                  s='$(npm config get prefix)/{lib/node_modules,bin,share}',))
                 sudo('npm i --unsafe-perm=true', user=nonroot)
             if exists('typings.json'):
                 if cmd_avail('typings'):
@@ -140,12 +137,12 @@ def nginx1(*args, **kwargs):
 
 
 def _send_nginx_conf(conf_remote_filename, proxy_block_local_filepath, sites_avail_local_filepath, conf_vars):
-    print '_send_nginx_conf', conf_remote_filename, proxy_block_local_filepath, sites_avail_local_filepath, conf_vars, ';'
     context = {'NGINX_PORT': conf_vars['NGINX_PORT'],
                'DNS_NAMES': ' '.join(conf_vars['DNS_NAMES']),
                'DESCRIPTION': conf_vars['DESCRIPTION'],
                'WWWPATH': conf_vars['WWWPATH'],
-               'WWWROOT': conf_vars['WWWROOT']}
+               'WWWROOT': conf_vars['WWWROOT'],
+               'EXTRA_BLOCKS': '{}\n'.format(conf_vars['EXTRA_BLOCKS']) if 'EXTRA_BLOCKS' in conf_vars else ''}
 
     if proxy_block_local_filepath is not None and 'PROXY_ROUTE' in conf_vars and 'PROXY_PASS' in conf_vars:
         with open(proxy_block_local_filepath, 'rt') as f:
@@ -236,14 +233,14 @@ def _nginx_cerbot_setup(domains, https_cert_email, conf_dirs=('/etc/nginx/sites-
         sudo('systemctl start -q {service_name} --no-pager --full'.format(service_name=service_name))
     else:
         sudo('systemctl reload -q {service_name} --no-pager --full'.format(service_name=service_name))
-    print cerbot_cmds
+    print 'cerbot_cmds =', cerbot_cmds
     certbot_res = tuple(imap(run_cmd, cerbot_cmds))
     sudo('cp /etc/nginx/sites-disabled/* /etc/nginx/sites-enabled')
 
     # sudo('rm -r /etc/nginx/sites-disabled')
 
     def secure_conf(dns_name, conf_loc, https_header):
-        print 'one({!r}, {!r})'.format(dns_name, conf_loc)
+        # print 'secure_conf({!r}, {!r})'.format(dns_name, conf_loc)
         if run_cmd('grep -Fq 443 {conf_loc}'.format(conf_loc=conf_loc)).failed:
             logger.warning('Skipping {conf_loc}; 443 already found within'.format(conf_loc=conf_loc))
         sio = StringIO()
