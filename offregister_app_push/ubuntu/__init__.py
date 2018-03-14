@@ -60,7 +60,7 @@ def push0(**kwargs):
             if run_cmd('npm i --unsafe-perm=true', warn_only=True).failed:
                 # sudo('chown -R {user} {npm_tmp}'.format(user=user, npm_tmp=npm_tmp))
                 run_cmd('chown -R {u} {d} {s}'.format(u=nonroot, d=kwargs['GIT_DIR'],
-                                                  s='$(npm config get prefix)/{lib/node_modules,bin,share}',))
+                                                      s='$(npm config get prefix)/{lib/node_modules,bin,share}', ))
                 sudo('npm i --unsafe-perm=true', user=nonroot)
             if exists('typings.json'):
                 if cmd_avail('typings'):
@@ -83,11 +83,11 @@ def push0(**kwargs):
                 rdbms_uri = run('echo "$RDBMS_URI"')
 
             kwargs['Environments'] = '{}\n'.format(kwargs['Environments']) if 'Environments' in kwargs else ''
-            kwargs['Environments'] += 'Environment=RDBMS_URI={rdbms_uri}\n' \
+            kwargs['Environments'] += "Environment='RDBMS_URI={rdbms_uri}'\n" \
                                       'Environment=PORT={port}\n'.format(rdbms_uri=rdbms_uri,
                                                                          port=kwargs['REST_API_PORT'])
             if 'DAEMON_ENV' in kwargs and kwargs['DAEMON_ENV']:
-                kwargs['Environments'] += '\n'.join('Environment={k}={v}'.format(k=k, v=v)
+                kwargs['Environments'] += '\n'.join("Environment='{k}={v}'".format(k=k, v=v)
                                                     for k, v in kwargs['DAEMON_ENV'].iteritems()
                                                     if not k.startswith('$$'))
                 if "$$ENV_JSON_FILE" in kwargs['DAEMON_ENV']:
