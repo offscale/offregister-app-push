@@ -24,10 +24,9 @@ from offregister_app_push import get_logger
 logger = get_logger(modules[__name__].__name__)
 
 
-def push0(**kwargs):
+def push0(destroy_node_modules=True, **kwargs):
     apt_depends('git')
 
-    destroy_node_modules = kwargs.get('destroy_node_modules', True)
     nm = '{}/{}'.format(kwargs['GIT_DIR'], 'node_modules')
     if not destroy_node_modules and exists(nm):
         sudo('cp -r "{nm}" /tmp/node_modules'.format(nm=nm))  # TODO: get new temp dir
@@ -46,6 +45,26 @@ def push0(**kwargs):
             if not cmd_avail('npm'):
                 logger.warn('npm not installed; skipping')
                 return
+
+            if kwargs['RDBMS_URI']:
+                rdbms_uri = kwargs['RDBMS_URI'] if isinstance(kwargs['RDBMS_URI'], basestring) \
+                    else ''.join(imap(str, kwargs['RDBMS_URI']))
+            else:
+                rdbms_uri = run('echo "$RDBMS_URI"')
+
+            kwargs['Environments'] = '{}\n'.format(kwargs['Environments']) if 'Environments' in kwargs else ''
+            kwargs['Environments'] += "Environment='RDBMS_URI={rdbms_uri}'\n" \
+                                      'Environment=PORT={port}\n'.format(rdbms_uri=rdbms_uri,
+                                                                         port=kwargs['REST_API_PORT'])
+            if 'DAEMON_ENV' in kwargs and kwargs['DAEMON_ENV']:
+                kwargs['Environments'] += '\n'.join("Environment='{k}={v}'".format(k=k, v=v)
+                                                    for k, v in kwargs['DAEMON_ENV'].iteritems()
+                                                    if not k.startswith('$$'))
+                if "$$ENV_JSON_FILE" in kwargs['DAEMON_ENV']:
+                    kwargs['Environments'] += '\n' + run("""python -c 'import json; f=open("{fname}");{rest}""".format(
+                        fname=kwargs['DAEMON_ENV']['$$ENV_JSON_FILE'],
+                        rest='d=json.load(f);print chr(10).join("Environment={q}{k}={v}{q}".format(q=chr(34), k=k, v=v) for k,v in d.iteritems()).replace(chr(34), chr(39)); f.close()\''
+                    ))
 
             npm_tmp = run_cmd('echo $HOME/.npm/_cacache/tmp', quiet=True)
             install_global_npm_packages1(npm_global_packages=kwargs.get('npm_global_packages'),
@@ -76,27 +95,6 @@ def push0(**kwargs):
             home_dir = run('echo $HOME', quiet=True)
             curr_dir = run('echo "${PWD##*/}"')
 
-            if kwargs['RDBMS_URI']:
-                rdbms_uri = kwargs['RDBMS_URI'] if isinstance(kwargs['RDBMS_URI'], basestring) \
-                    else ''.join(imap(str, kwargs['RDBMS_URI']))
-            else:
-                rdbms_uri = run('echo "$RDBMS_URI"')
-
-            kwargs['Environments'] = '{}\n'.format(kwargs['Environments']) if 'Environments' in kwargs else ''
-            kwargs['Environments'] += "Environment='RDBMS_URI={rdbms_uri}'\n" \
-                                      'Environment=PORT={port}\n'.format(rdbms_uri=rdbms_uri,
-                                                                         port=kwargs['REST_API_PORT'])
-            if 'DAEMON_ENV' in kwargs and kwargs['DAEMON_ENV']:
-                kwargs['Environments'] += '\n'.join("Environment='{k}={v}'".format(k=k, v=v)
-                                                    for k, v in kwargs['DAEMON_ENV'].iteritems()
-                                                    if not k.startswith('$$'))
-                if "$$ENV_JSON_FILE" in kwargs['DAEMON_ENV']:
-                    kwargs['Environments'] += '\n' + run(
-                        "node -e 'e=require(" + '`{fname}`'.format(
-                            fname=kwargs['DAEMON_ENV']['$$ENV_JSON_FILE']
-                        ) + "); Object.keys(e).forEach(k => k.startsWith('$$') || console.info(`Environment=${k}=${e[k]}`))'",
-                        shell_escape=False, shell=False
-                    )
             kwargs['WorkingDirectory'] = kwargs['GIT_DIR']
             kwargs['ExecStart'] = kwargs['ExecStart'].format(home_dir=home_dir)
             kwargs['service_name'] = curr_dir
