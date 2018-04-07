@@ -17,12 +17,13 @@ def build_node_app(kwargs, run_cmd):
     if user != nonroot:
         logger.info('user = "{user}"; nonroot = "{user}"')
 
-    if not exists('$HOME/n/bin'):
-        install_node0(node_version=kwargs.get('node_version'), use_sudo=False, node_sudo=False)
+    n_prefix = kwargs.get('N_PREFIX', run_cmd('echo $HOME/n', quiet=True))
+    if not exists('{n_prefix}/bin'.format(n_prefix=n_prefix)):
+        install_node0(node_version=kwargs.get('node_version'), use_sudo=False, node_sudo=False, N_PREFIX=n_prefix)
     if not cmd_avail('npm'):
         return '[Warn]: npm not installed; skipping'
     npm_tmp = run_cmd('echo $HOME/.npm/_cacache/tmp', quiet=True)
-    install_global_npm_packages1(npm_global_packages=kwargs.get('npm_global_packages'),
+    install_global_npm_packages1(npm_global_packages=kwargs.get('npm_global_packages'), N_PREFIX=n_prefix,
                                  use_sudo=False, node_sudo=False)
     if run_cmd('npm i --unsafe-perm=true', warn_only=True).failed:
         # sudo('chown -R {user} {npm_tmp}'.format(user=user, npm_tmp=npm_tmp))
