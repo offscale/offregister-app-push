@@ -4,7 +4,7 @@ from functools import partial
 from pkg_resources import resource_filename
 from os import path
 
-from fabric.operations import run, _run_command, sudo
+from fabric.operations import _run_command, sudo
 from fabric.contrib.files import exists, append
 from fabric.context_managers import cd, shell_env
 
@@ -27,16 +27,16 @@ logger = get_logger(modules[__name__].__name__)
 def pull0(destory_cache=True, **kwargs):
     apt_depends('git')
 
-    run_cmd = partial(_run_command, sudo=kwargs.get('use_sudo', False))
+    run_cmd = partial(_run_command, sudo=kwargs.get('use_sudo'))
 
     cache = not destory_cache and exists(kwargs['GIT_DIR'])
 
     if cache:
-        dirnam = sudo("mktemp -d --suffix '{name}'".format(name=kwargs['GIT_DIR'][kwargs['GIT_DIR'].rfind('/') + 1:]))
+        dirnam = run_cmd("mktemp -d --suffix '{name}'".format(name=kwargs['GIT_DIR'][kwargs['GIT_DIR'].rfind('/') + 1:]))
         run_cmd('''while read -r l; do [ -e "$l" ] && mv "$l" '{dirnam}' & done <'{git_dir}/.gitignore' '''.format(
             dirnam=dirnam, git_dir=kwargs['GIT_DIR'])
         )
-    run_cmd("mkdir -p '{GIT_DIR}'".format(GIT_DIR=kwargs['GIT_DIR']))
+
     clone_or_update(repo=kwargs['GIT_REPO'], to_dir=kwargs['GIT_DIR'], use_sudo=kwargs.get('use_sudo', False),
                     branch=kwargs.get('GIT_BRANCH', 'master'), skip_reset=kwargs.get('skip_reset', False),
                     cmd_runner=run_cmd)
@@ -57,7 +57,7 @@ def build_app1(**kwargs):
     # TODO: Split this up into multiple environments: node, docker, python, ruby, scala &etc.
     # TODO: Read Procfile, Dockerfile and any other signature hints (like existent package.json) for this
     # TODO: Use ^ to acquire extra environment variables needed for the systemd service
-    run_cmd = partial(_run_command, sudo=kwargs.get('use_sudo', False))
+    run_cmd = partial(_run_command, sudo=kwargs.get('use_sudo'))
 
     if exists('{git_dir}/package.json'.format(git_dir=kwargs['GIT_DIR'])):
         with cd(kwargs['GIT_DIR']), shell_env(PATH='$HOME/n/bin:$PATH'):
@@ -69,8 +69,10 @@ def build_app1(**kwargs):
 def service2(**kwargs):
     if 'ExecStart' not in kwargs:
         if 'node_main' in kwargs:
-            kwargs['ExecStart'] = "/bin/bash -c 'PATH={home_dir}/n/bin:$PATH {home_dir}/n/bin/node {main}'".format(
-                home_dir=run('echo $HOME', quiet=True), main=kwargs['node_main']
+            n_prefix = kwargs.get('N_PREFIX',
+                                  _run_command('echo $HOME/n', quiet=True, sudo=kwargs.get('use_sudo')))
+            kwargs['ExecStart'] = "/bin/bash -c 'PATH={n_prefix}/bin:$PATH {n_prefix}/bin/node {main}'".format(
+                n_prefix=n_prefix, main=kwargs['node_main']
             )
         else:
             return "[Warn]: 'ExecStart' not in kwargs; skipping service installation"

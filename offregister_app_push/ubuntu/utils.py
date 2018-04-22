@@ -51,7 +51,7 @@ def _nginx_cerbot_setup(domains, https_cert_email, conf_dirs=('/etc/nginx/sites-
     if domains != 'all':
         raise NotImplementedError('{} for domains'.format(domains))
 
-    run_cmd = partial(_run_command, sudo=use_sudo, warn_only=warn_only, quiet=quiet)
+    run_cmd = partial(_run_command, sudo=use_sudo)
 
     server_names_t = tuple(chain(*(run_cmd("grep -RF server_name '{conf_dir}'".format(conf_dir=conf_dir)).split('\n')
                                    for conf_dir in conf_dirs)))
