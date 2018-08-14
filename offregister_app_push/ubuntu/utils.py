@@ -5,7 +5,7 @@ from os import path
 from sys import modules
 from pkg_resources import resource_filename
 
-from fabric.contrib.files import upload_template
+from fabric.contrib.files import upload_template, exists
 from fabric.operations import sudo, put, get, _run_command, run
 
 from offregister_fab_utils.apt import apt_depends
@@ -79,8 +79,9 @@ def _nginx_cerbot_setup(domains, https_cert_email, conf_dirs=('/etc/nginx/sites-
     def certbot_prep(dns_name, conf_loc):
         run_cmd("mv '{}' '/etc/nginx/sites-disabled/{}'".format(conf_loc, path.split(conf_loc)[1]))
         wwwroot = '/var/www/static/{dns_name}'.format(dns_name=dns_name)
-        run_cmd("rm -r '{wwwroot}'".format(wwwroot=wwwroot))
-        run_cmd("mkdir '{wwwroot}'".format(wwwroot=wwwroot))
+        if exists(wwwroot):
+            run_cmd("rm -r '{wwwroot}'".format(wwwroot=wwwroot))
+        run_cmd("mkdir -p '{wwwroot}'".format(wwwroot=wwwroot))
         _send_nginx_conf(conf_remote_filename='/etc/nginx/sites-enabled/{dns_name}-certbot'.format(dns_name=dns_name),
                          sites_avail_local_filepath=sites_avail_local_filepath,
                          proxy_block_local_filepath=None,
@@ -93,7 +94,8 @@ def _nginx_cerbot_setup(domains, https_cert_email, conf_dirs=('/etc/nginx/sites-
             dns_name=dns_name, wwwroot=wwwroot)
         return "-w '{wwwroot}' -d '{dns_name}' ".format(dns_name=dns_name, wwwroot=wwwroot)
 
-    secured_already = frozenset(run_cmd('ls /etc/letsencrypt/live').splitlines())
+    secured_already = frozenset(run_cmd('ls /etc/letsencrypt/live', warn_only=True).splitlines()) \
+        if exists('/etc/letsencrypt/live') else tuple()
     cerbot_cmds = tuple(
         'certbot certonly --agree-tos -m {https_cert_email} --webroot {root}'.format(https_cert_email=https_cert_email,
                                                                                      root=certbot_prep(dns_name,
@@ -119,7 +121,7 @@ def _nginx_cerbot_setup(domains, https_cert_email, conf_dirs=('/etc/nginx/sites-
 
     def secure_conf(dns_name, conf_loc, https_header):
         # print 'secure_conf({!r}, {!r})'.format(dns_name, conf_loc)
-        if run_cmd('grep -Fq 443 {conf_loc}'.format(conf_loc=conf_loc)).failed:
+        if run_cmd('grep -Fq 443 {conf_loc}'.format(conf_loc=conf_loc), warn_only=True).failed:
             logger.warning('Skipping {conf_loc}; 443 already found within'.format(conf_loc=conf_loc))
         sio = StringIO()
         get(remote_path=conf_loc, use_sudo=use_sudo, local_path=sio)
