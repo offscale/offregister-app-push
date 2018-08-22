@@ -53,6 +53,9 @@ def _nginx_cerbot_setup(domains, https_cert_email, conf_dirs=('/etc/nginx/sites-
 
     run_cmd = partial(_run_command, sudo=use_sudo)
 
+    if not run("ls -A '{conf_dir}'".format(conf_dir=conf_dirs[0]), shell_escape=False):
+        return 'hosts_d is empty empty; skipping'
+
     server_names_t = tuple(chain(*(run_cmd("grep -RF server_name '{conf_dir}'".format(conf_dir=conf_dir)).split('\n')
                                    for conf_dir in conf_dirs)))
 
