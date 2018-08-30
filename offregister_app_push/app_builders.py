@@ -3,9 +3,9 @@ from sys import modules
 from fabric.context_managers import shell_env
 from fabric.contrib.files import exists
 from fabric.operations import sudo, run
-
 from offregister_fab_utils.fs import cmd_avail
 from offregister_node.ubuntu import install_node0, install_global_npm_packages1
+from offregister_node.utils import install_node
 
 from offregister_app_push import get_logger
 
@@ -20,7 +20,9 @@ def build_node_app(kwargs, run_cmd):
 
     n_prefix = kwargs.get('N_PREFIX', run_cmd('echo $HOME/n', quiet=True))
     if not exists('{n_prefix}/bin'.format(n_prefix=n_prefix)):
-        install_node0(node_version=kwargs.get('node_version'), use_sudo=False, node_sudo=False, N_PREFIX=n_prefix)
+        (install_node0 if 'Ubuntu' in run('uname -v') else install_node)(
+            node_version=kwargs.get('node_version'), use_sudo=False, node_sudo=False, N_PREFIX=n_prefix
+        )
 
     with shell_env(PATH='$PATH:{n_prefix}/bin'.format(n_prefix=n_prefix)):
         if not cmd_avail('npm'):

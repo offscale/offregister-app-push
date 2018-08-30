@@ -17,7 +17,7 @@ from offregister_fab_utils.fs import cmd_avail
 from offregister_fab_utils.git import clone_or_update
 
 from offregister_app_push import get_logger
-from offregister_app_push.ubuntu.app_builders import build_node_app
+from offregister_app_push.app_builders import build_node_app
 from offregister_app_push.ubuntu.utils import _install_upgrade_service, _send_nginx_conf, _nginx_cerbot_setup, \
     _environment
 
