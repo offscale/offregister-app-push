@@ -1,20 +1,17 @@
-from itertools import imap
-from sys import modules
 from functools import partial
-from pkg_resources import resource_filename
+from itertools import imap
 from os import path
+from sys import modules
 
-from fabric.operations import _run_command, sudo, run, put
-from fabric.contrib.files import exists, append
 from fabric.context_managers import cd, shell_env
-
-from offregister_fab_utils.ubuntu.systemd import restart_systemd
-
-from offutils import it_consumes
-
+from fabric.contrib.files import exists, append
+from fabric.operations import _run_command, sudo, run, put
 from offregister_fab_utils.apt import apt_depends
 from offregister_fab_utils.fs import cmd_avail
 from offregister_fab_utils.git import clone_or_update
+from offregister_fab_utils.ubuntu.systemd import restart_systemd
+from offutils import it_consumes
+from pkg_resources import resource_filename
 from six import StringIO
 
 from offregister_app_push import get_logger
@@ -33,7 +30,8 @@ def pull0(destory_cache=True, **kwargs):
     cache = not destory_cache and exists(kwargs['GIT_DIR'])
 
     if cache:
-        dirnam = run_cmd("mktemp -d --suffix '{name}'".format(name=kwargs['GIT_DIR'][kwargs['GIT_DIR'].rfind('/') + 1:]))
+        dirnam = run_cmd(
+            "mktemp -d --suffix '{name}'".format(name=kwargs['GIT_DIR'][kwargs['GIT_DIR'].rfind('/') + 1:]))
         run_cmd('''while read -r l; do [ -e "$l" ] && mv "$l" '{dirnam}' & done <'{git_dir}/.gitignore' '''.format(
             dirnam=dirnam, git_dir=kwargs['GIT_DIR'])
         )
@@ -86,7 +84,7 @@ def nginx3(**kwargs):
     if not kwargs['nginx']:
         return '[Warn]: skipping nginx'
 
-    if not cmd_avail('nginx'):
+    if not cmd_avail('nginx') and not exists('/etc/nginx'):
         uname = run('uname -v')
         sio = StringIO()
 
@@ -116,7 +114,14 @@ def nginx3(**kwargs):
     proxy_block_local_filepath = kwargs.get('nginx-proxy-block',
                                             resource_filename('offregister_app_push',
                                                               path.join('conf', 'nginx.proxy_block.conf')))
-    conf_remote_filename = '/etc/nginx/sites-enabled/{service_name}'.format(service_name=kwargs['app_name'])
+    remote_conf_dir = '/etc/nginx/sites-enabled'
+    if not exists(remote_conf_dir):
+        sudo('mkdir -p {}'.format(remote_conf_dir))
+        sudo(r"sed -i '/include \/etc\/nginx\/conf.d\/\*.conf;/ a\ \ \ \ include {remote_dir}/*;' {fname}".format(
+            remote_dir=remote_conf_dir, fname='/etc/nginx/nginx.conf'
+        ))
+
+    conf_remote_filename = '/etc/nginx/sites-enabled/{service_name}.conf'.format(service_name=kwargs['app_name'])
     it_consumes(imap(lambda dns_name: append(text='127.0.0.1\t{site_name}'.format(site_name=dns_name),
                                              filename='/etc/hosts', use_sudo=True),
                      kwargs['DNS_NAMES']))
