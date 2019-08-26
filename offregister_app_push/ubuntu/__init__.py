@@ -4,7 +4,7 @@ from functools import partial
 from pkg_resources import resource_filename
 from os import path
 
-from fabric.operations import _run_command, sudo
+from fabric.operations import _run_command, sudo, run, put
 from fabric.contrib.files import exists, append
 from fabric.context_managers import cd, shell_env
 
@@ -15,6 +15,7 @@ from offutils import it_consumes
 from offregister_fab_utils.apt import apt_depends
 from offregister_fab_utils.fs import cmd_avail
 from offregister_fab_utils.git import clone_or_update
+from six import StringIO
 
 from offregister_app_push import get_logger
 from offregister_app_push.app_builders import build_node_app
@@ -86,7 +87,25 @@ def nginx3(**kwargs):
         return '[Warn]: skipping nginx'
 
     if not cmd_avail('nginx'):
-        sudo('add-apt-repository -y ppa:nginx/stable')
+        uname = run('uname -v')
+        sio = StringIO()
+
+        def common_debian_ubuntu():
+            apt_depends('curl', 'gnupg2', 'ca-certificates', 'lsb-release')
+            release = run('lsb_release -cs')
+            sio.write('deb http://nginx.org/packages/debian {release} nginx'.format(release=release))
+            put(sio, '/etc/apt/sources.list.d/nginx.list', use_sudo=True)
+            sudo('apt-get update -qq')
+
+        if 'Ubuntu' in uname:
+            common_debian_ubuntu()
+        elif 'Debian' in uname:
+            common_debian_ubuntu()
+        else:
+            raise NotImplementedError()
+
+        sudo('curl -fsSL https://nginx.org/keys/nginx_signing.key | apt-key add -')
+        sudo('apt-key fingerprint ABF5BD827BD9BF62')
         apt_depends('nginx')
 
     # TODO: Move this to an nginx module; usable by other `offregister-` packages

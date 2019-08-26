@@ -24,7 +24,7 @@ if __name__ == '__main__':
         name=package_name,
         author=__author__,
         version=__version__,
-        description='Angular deployment module for Fabric (offregister)',
+        description='Deploy Node.JS and static file applications & certbot to install HTTPS certificates (in nginx).',
         classifiers=[
             'Development Status :: 7 - Inactive',
             'Intended Audience :: Developers',
