@@ -88,19 +88,19 @@ def nginx3(**kwargs):
         uname = run('uname -v')
         sio = StringIO()
 
-        def common_debian_ubuntu():
-            apt_depends('curl', 'gnupg2', 'ca-certificates', 'lsb-release')
-            release = run('lsb_release -cs')
-            sio.write('deb http://nginx.org/packages/debian {release} nginx'.format(release=release))
-            put(sio, '/etc/apt/sources.list.d/nginx.list', use_sudo=True)
-            sudo('apt-get update -qq')
-
+        flavour = None
         if 'Ubuntu' in uname:
-            common_debian_ubuntu()
+            flavour = 'ubuntu'
         elif 'Debian' in uname:
-            common_debian_ubuntu()
-        else:
+            flavour = 'debian'
+        if flavour is None:
             raise NotImplementedError()
+
+        apt_depends('curl', 'gnupg2', 'ca-certificates', 'lsb-release')
+        release = run('lsb_release -cs')
+        sio.write('deb http://nginx.org/packages/{flavour} {release} nginx'.format(flavour=flavour, release=release))
+        put(sio, '/etc/apt/sources.list.d/nginx.list', use_sudo=True)
+        sudo('apt-get update -qq')
 
         sudo('curl -fsSL https://nginx.org/keys/nginx_signing.key | apt-key add -')
         sudo('apt-key fingerprint ABF5BD827BD9BF62')
