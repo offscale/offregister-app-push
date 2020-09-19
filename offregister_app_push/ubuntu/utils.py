@@ -1,8 +1,13 @@
-from io import StringIO
+from sys import version, modules
+
+if version[0] == "2":
+    from cStringIO import StringIO
+
+else:
+    from io import StringIO
 from functools import partial
 from itertools import chain
 from os import path
-from sys import modules
 from pkg_resources import resource_filename
 
 from fabric.contrib.files import upload_template, exists
