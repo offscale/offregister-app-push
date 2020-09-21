@@ -1,3 +1,4 @@
+from __future__ import print_function
 from sys import version, modules
 
 if version[0] == "2":
@@ -163,11 +164,9 @@ def _nginx_cerbot_setup(
             },
         )
         print(
-            (
-                'one("{}", "{}") ='.format(dns_name, conf_loc),
-                "-w '{wwwroot}' -d '{dns_name}' ".format(
-                    dns_name=dns_name, wwwroot=wwwroot
-                ),
+            'one("{}", "{}") ='.format(dns_name, conf_loc),
+            "-w '{wwwroot}' -d '{dns_name}' ".format(
+                dns_name=dns_name, wwwroot=wwwroot
             )
         )
         return "-w '{wwwroot}' -d '{dns_name}' ".format(
@@ -208,7 +207,7 @@ def _nginx_cerbot_setup(
                 service_name=service_name
             )
         )
-    print(("cerbot_cmds =", cerbot_cmds))
+    print("cerbot_cmds =", cerbot_cmds)
     certbot_res = tuple(map(run_cmd, cerbot_cmds))
     sudo("cp /etc/nginx/sites-disabled/* /etc/nginx/sites-enabled")
 
