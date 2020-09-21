@@ -1,7 +1,7 @@
 from functools import partial
 
 from os import path
-from sys import modules
+from sys import modules, version
 
 from fabric.context_managers import cd, shell_env
 from fabric.contrib.files import exists, append
@@ -12,7 +12,12 @@ from offregister_fab_utils.git import clone_or_update
 from offregister_fab_utils.ubuntu.systemd import restart_systemd
 from offutils import it_consumes
 from pkg_resources import resource_filename
-from six import StringIO
+
+if version[0] == "2":
+    from cStringIO import StringIO
+    from itertools import imap as map
+else:
+    from io import StringIO
 
 from offregister_app_push import get_logger
 from offregister_app_push.app_builders import build_node_app

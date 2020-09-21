@@ -2,7 +2,7 @@ from sys import version, modules
 
 if version[0] == "2":
     from cStringIO import StringIO
-
+    from itertools import imap as map
 else:
     from io import StringIO
 from functools import partial
