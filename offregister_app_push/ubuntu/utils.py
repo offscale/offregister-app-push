@@ -1,11 +1,18 @@
 from __future__ import print_function
+
+from operator import methodcaller
 from sys import version, modules
 
 if version[0] == "2":
     from cStringIO import StringIO
     from itertools import imap as map
+
+    iteritems = methodcaller("iteritems")
 else:
     from io import StringIO
+
+    iteritems = methodcaller("items")
+
 from functools import partial
 from itertools import chain
 from os import path
@@ -167,7 +174,7 @@ def _nginx_cerbot_setup(
             'one("{}", "{}") ='.format(dns_name, conf_loc),
             "-w '{wwwroot}' -d '{dns_name}' ".format(
                 dns_name=dns_name, wwwroot=wwwroot
-            )
+            ),
         )
         return "-w '{wwwroot}' -d '{dns_name}' ".format(
             dns_name=dns_name, wwwroot=wwwroot
@@ -271,7 +278,7 @@ def _nginx_cerbot_setup(
         https_header = f.read()
     replaced_confs = tuple(
         secure_conf(dns_name, conf_loc, https_header)
-        for dns_name, conf_loc in list(hosts_d.items())
+        for dns_name, conf_loc in list(iteritems(hosts_d))
     )
 
     sudo(
