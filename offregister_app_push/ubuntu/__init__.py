@@ -1,3 +1,4 @@
+from collections import deque
 from functools import partial
 
 from os import path
@@ -159,17 +160,16 @@ def nginx3(**kwargs):
     conf_remote_filename = "/etc/nginx/sites-enabled/{service_name}.conf".format(
         service_name=kwargs["app_name"]
     )
-    it_consumes(
-        list(
-            map(
-                lambda dns_name: append(
-                    text="127.0.0.1\t{site_name}".format(site_name=dns_name),
-                    filename="/etc/hosts",
-                    use_sudo=True,
-                ),
-                kwargs["DNS_NAMES"],
-            )
-        )
+    deque(
+        map(
+            lambda dns_name: append(
+                text="127.0.0.1\t{site_name}".format(site_name=dns_name),
+                filename="/etc/hosts",
+                use_sudo=True,
+            ),
+            kwargs["DNS_NAMES"],
+        ),
+        maxlen=0,
     )
 
     _send_nginx_conf(

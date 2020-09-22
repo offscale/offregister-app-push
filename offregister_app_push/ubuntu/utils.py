@@ -3,15 +3,13 @@ from __future__ import print_function
 from operator import methodcaller
 from sys import version, modules
 
+from offutils.util import iteritems
+
 if version[0] == "2":
     from cStringIO import StringIO
     from itertools import imap as map
-
-    iteritems = methodcaller("iteritems")
 else:
     from io import StringIO
-
-    iteritems = methodcaller("items")
 
 from functools import partial
 from itertools import chain
@@ -189,7 +187,7 @@ def _nginx_cerbot_setup(
         "certbot certonly --agree-tos -m {https_cert_email} --webroot {root}".format(
             https_cert_email=https_cert_email, root=certbot_prep(dns_name, conf_loc)
         )
-        for dns_name, conf_loc in list(hosts_d.items())
+        for dns_name, conf_loc in iteritems(hosts_d)
         if dns_name not in secured_already
     )
 
@@ -278,7 +276,7 @@ def _nginx_cerbot_setup(
         https_header = f.read()
     replaced_confs = tuple(
         secure_conf(dns_name, conf_loc, https_header)
-        for dns_name, conf_loc in list(iteritems(hosts_d))
+        for dns_name, conf_loc in iteritems(hosts_d)
     )
 
     sudo(
@@ -336,7 +334,7 @@ def _environment(kwargs):
     if "DAEMON_ENV" in kwargs and kwargs["DAEMON_ENV"]:
         kwargs["Environments"] += "\n".join(
             "Environment='{k}={v}'".format(k=k, v=v)
-            for k, v in list(kwargs["DAEMON_ENV"].items())
+            for k, v in iteritems(kwargs["DAEMON_ENV"])
             if not k.startswith("$$")
         )
         if "$$ENV_JSON_FILE" in kwargs["DAEMON_ENV"]:
