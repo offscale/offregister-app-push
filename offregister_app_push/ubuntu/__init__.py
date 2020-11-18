@@ -76,7 +76,7 @@ def build_app1(**kwargs):
     # TODO: Split this up into multiple environments: node, docker, python, ruby, scala &etc.
     # TODO: Read Procfile, Dockerfile and any other signature hints (like existent package.json) for this
     # TODO: Use ^ to acquire extra environment variables needed for the systemd service
-    run_cmd = partial(_run_command, sudo=kwargs.get("use_sudo"))
+    run_cmd = partial(_run_command, sudo=kwargs.get("node_sudo", kwargs.get("use_sudo")))
 
     if exists("{git_dir}/package.json".format(git_dir=kwargs["GIT_DIR"])):
         with cd(kwargs["GIT_DIR"]), shell_env(PATH="$HOME/n/bin:$PATH"):
@@ -90,7 +90,7 @@ def service2(**kwargs):
         if "node_main" in kwargs:
             n_prefix = kwargs.get(
                 "N_PREFIX",
-                _run_command("echo $HOME/n", quiet=True, sudo=kwargs.get("use_sudo")),
+                _run_command("echo $HOME/n", quiet=True, sudo=kwargs.get("node_sudo", kwargs.get("use_sudo"))),
             )
             kwargs[
                 "ExecStart"

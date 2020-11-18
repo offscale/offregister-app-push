@@ -3,6 +3,7 @@ from __future__ import print_function
 from operator import methodcaller
 from sys import version, modules
 
+from offregister_certbot.shared import install
 from offutils.util import iteritems
 
 if version[0] == "2":
@@ -88,9 +89,7 @@ def _nginx_cerbot_setup(
     quiet=True,
 ):
     if not cmd_avail("certbot"):
-        apt_depends("software-properties-common")
-        sudo("add-apt-repository -y ppa:certbot/certbot")
-        apt_depends("python-certbot-nginx")
+        install()
 
     if domains != "all":
         raise NotImplementedError("{} for domains".format(domains))
