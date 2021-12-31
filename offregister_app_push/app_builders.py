@@ -2,9 +2,9 @@ from sys import modules
 
 from fabric.context_managers import shell_env
 from fabric.contrib.files import exists
-from fabric.operations import sudo, run
+from fabric.operations import run, sudo
 from offregister_fab_utils.fs import cmd_avail
-from offregister_node.ubuntu import install_node0, install_global_npm_packages1
+from offregister_node.ubuntu import install_global_npm_packages1, install_node0
 from offregister_node.utils import install_node
 
 from offregister_app_push import get_logger

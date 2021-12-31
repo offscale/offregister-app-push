@@ -1,31 +1,29 @@
 from __future__ import print_function
 
-from operator import methodcaller
-from sys import version, modules
+from sys import modules, version
 
 from offregister_certbot.shared import install
 from offutils.util import iteritems
 
 if version[0] == "2":
-    from cStringIO import StringIO
     from itertools import imap as map
+
+    from cStringIO import StringIO
 else:
     from io import StringIO
 
 from functools import partial
 from itertools import chain
 from os import path
-from pkg_resources import resource_filename
 
-from fabric.contrib.files import upload_template, exists
-from fabric.operations import sudo, put, get, _run_command, run
-
-from offregister_fab_utils.apt import apt_depends
+from fabric.contrib.files import exists, upload_template
+from fabric.operations import _run_command, get, put, run, sudo
 from offregister_fab_utils.fs import cmd_avail
 from offregister_fab_utils.ubuntu.systemd import (
     install_upgrade_service,
     restart_systemd,
 )
+from pkg_resources import resource_filename
 
 from offregister_app_push import get_logger
 

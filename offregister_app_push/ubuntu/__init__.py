@@ -1,32 +1,31 @@
 from collections import deque
 from functools import partial
-
 from os import path
 from sys import modules, version
 
 from fabric.context_managers import cd, shell_env
-from fabric.contrib.files import exists, append
-from fabric.operations import _run_command, sudo, run, put
+from fabric.contrib.files import append, exists
+from fabric.operations import _run_command, put, run, sudo
 from offregister_fab_utils.apt import apt_depends
 from offregister_fab_utils.fs import cmd_avail
 from offregister_fab_utils.git import clone_or_update
 from offregister_fab_utils.ubuntu.systemd import restart_systemd
-from offutils import it_consumes
 from pkg_resources import resource_filename
 
 if version[0] == "2":
-    from cStringIO import StringIO
     from itertools import imap as map
+
+    from cStringIO import StringIO
 else:
     from io import StringIO
 
 from offregister_app_push import get_logger
 from offregister_app_push.app_builders import build_node_app
 from offregister_app_push.ubuntu.utils import (
-    _install_upgrade_service,
-    _send_nginx_conf,
-    _nginx_cerbot_setup,
     _environment,
+    _install_upgrade_service,
+    _nginx_cerbot_setup,
+    _send_nginx_conf,
 )
 
 logger = get_logger(modules[__name__].__name__)
