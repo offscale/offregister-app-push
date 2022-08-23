@@ -1,11 +1,9 @@
 from collections import deque
-from functools import partial
 from os import path
 from sys import modules, version
 
-from fabric.context_managers import cd, shell_env
+from fabric.context_managers import shell_env
 from fabric.contrib.files import append, exists
-from fabric.operations import _run_command, put, run, sudo
 from offregister_fab_utils.apt import apt_depends
 from offregister_fab_utils.fs import cmd_avail
 from offregister_fab_utils.git import clone_or_update
@@ -15,7 +13,10 @@ from pkg_resources import resource_filename
 if version[0] == "2":
     from itertools import imap as map
 
-    from cStringIO import StringIO
+    try:
+        from cStringIO import StringIO
+    except ImportError:
+        from StringIO import StringIO
 else:
     from io import StringIO
 
@@ -32,11 +33,11 @@ logger = get_logger(modules[__name__].__name__)
 
 
 def pull0(destory_cache=True, **kwargs):
-    apt_depends("git")
+    apt_depends(c, "git")
 
-    run_cmd = partial(_run_command, sudo=kwargs.get("use_sudo"))
+    run_cmd = c.sudo if kwargs.get("use_sudo", False) else c.run
 
-    cache = not destory_cache and exists(kwargs["GIT_DIR"])
+    cache = not destory_cache and exists(c, runner=c.run, path=kwargs["GIT_DIR"])
 
     if cache:
         dirnam = run_cmd(
@@ -75,12 +76,14 @@ def build_app1(**kwargs):
     # TODO: Split this up into multiple environments: node, docker, python, ruby, scala &etc.
     # TODO: Read Procfile, Dockerfile and any other signature hints (like existent package.json) for this
     # TODO: Use ^ to acquire extra environment variables needed for the systemd service
-    run_cmd = partial(
-        _run_command, sudo=kwargs.get("node_sudo", kwargs.get("use_sudo"))
+    run_cmd = (
+        c.sudo if kwargs.get("node_sudo", kwargs.get("use_sudo", False)) else c.run
     )
 
-    if exists("{git_dir}/package.json".format(git_dir=kwargs["GIT_DIR"])):
-        with cd(kwargs["GIT_DIR"]), shell_env(PATH="$HOME/n/bin:$PATH"):
+    if exists(
+        c, runner=c.run, path="{git_dir}/package.json".format(git_dir=kwargs["GIT_DIR"])
+    ):
+        with c.cd(kwargs["GIT_DIR"]), shell_env(PATH="$HOME/n/bin:$PATH"):
             return build_node_app(run_cmd=run_cmd, kwargs=kwargs)
 
     return "[Warn]: Not building any app"
@@ -91,11 +94,10 @@ def service2(**kwargs):
         if "node_main" in kwargs:
             n_prefix = kwargs.get(
                 "N_PREFIX",
-                _run_command(
+                (c.sudo if kwargs.get("node_sudo", kwargs.get("use_sudo")) else c.run)(
                     "echo $HOME/n",
-                    quiet=True,
-                    sudo=kwargs.get("node_sudo", kwargs.get("use_sudo")),
-                ),
+                    hide=True,
+                ).stdout,
             )
             kwargs[
                 "ExecStart"
@@ -113,8 +115,8 @@ def nginx3(**kwargs):
     if not kwargs["nginx"]:
         return "[Warn]: skipping nginx"
 
-    if not cmd_avail("nginx") and not exists("/etc/nginx"):
-        uname = run("uname -v")
+    if not cmd_avail(c, "nginx") and not exists(c, runner=c.run, path="/etc/nginx"):
+        uname = c.run("uname -v").stdout.rstrip()
         sio = StringIO()
 
         flavour = None
@@ -125,19 +127,19 @@ def nginx3(**kwargs):
         if flavour is None:
             raise NotImplementedError()
 
-        apt_depends("curl", "gnupg2", "ca-certificates", "lsb-release")
-        release = run("lsb_release -cs")
+        apt_depends(c, "curl", "gnupg2", "ca-certificates", "lsb-release")
+        release = c.run("lsb_release -cs")
         sio.write(
             "deb http://nginx.org/packages/{flavour} {release} nginx".format(
                 flavour=flavour, release=release
             )
         )
-        put(sio, "/etc/apt/sources.list.d/nginx.list", use_sudo=True)
-        sudo("apt-get update -qq")
+        c.put(sio, "/etc/apt/sources.list.d/nginx.list", use_sudo=True)
+        c.sudo("apt-get update -qq")
 
-        sudo("curl -fsSL https://nginx.org/keys/nginx_signing.key | apt-key add -")
-        sudo("apt-key fingerprint ABF5BD827BD9BF62")
-        apt_depends("nginx")
+        c.sudo("curl -fsSL https://nginx.org/keys/nginx_signing.key | apt-key add -")
+        c.sudo("apt-key fingerprint ABF5BD827BD9BF62")
+        apt_depends(c, "nginx")
 
     # TODO: Move this to an nginx module; usable by other `offregister-` packages
 
@@ -154,9 +156,9 @@ def nginx3(**kwargs):
         ),
     )
     remote_conf_dir = "/etc/nginx/sites-enabled"
-    if not exists(remote_conf_dir):
-        sudo("mkdir -p {}".format(remote_conf_dir))
-        sudo(
+    if not exists(c, runner=c.run, path=remote_conf_dir):
+        c.sudo("mkdir -p {}".format(remote_conf_dir))
+        c.sudo(
             r"sed -i '/include \/etc\/nginx\/conf.d\/\*.conf;/ a\ \ \ \ include {remote_dir}/*;' {fname}".format(
                 remote_dir=remote_conf_dir, fname="/etc/nginx/nginx.conf"
             )

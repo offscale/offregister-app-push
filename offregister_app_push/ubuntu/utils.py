@@ -8,16 +8,17 @@ from offutils.util import iteritems
 if version[0] == "2":
     from itertools import imap as map
 
-    from cStringIO import StringIO
+    try:
+        from cStringIO import StringIO
+    except ImportError:
+        from StringIO import StringIO
 else:
     from io import StringIO
 
-from functools import partial
 from itertools import chain
 from os import path
 
-from fabric.contrib.files import exists, upload_template
-from fabric.operations import _run_command, get, put, run, sudo
+from fabric.contrib.files import exists
 from offregister_fab_utils.fs import cmd_avail
 from offregister_fab_utils.ubuntu.systemd import (
     install_upgrade_service,
@@ -69,7 +70,8 @@ def _send_nginx_conf(
     else:
         context["PROXY_BLOCKS"] = "    # No proxy blocks"
 
-    return upload_template(
+    return upload_template_fmt(
+        c,
         sites_avail_local_filepath,
         conf_remote_filename,
         context=context,
@@ -83,18 +85,20 @@ def _nginx_cerbot_setup(
     https_cert_email,
     conf_dirs=("/etc/nginx/sites-enabled",),
     use_sudo=True,
-    warn_only=True,
-    quiet=True,
+    warn=True,
+    hide=True,
 ):
-    if not cmd_avail("certbot"):
+    if not cmd_avail(c, "certbot"):
         install()
 
     if domains != "all":
         raise NotImplementedError("{} for domains".format(domains))
 
-    run_cmd = partial(_run_command, sudo=use_sudo)
+    run_cmd = c.sudo if kwargs.get("use_sudo", False) else c.run
 
-    if not run("ls -A '{conf_dir}'".format(conf_dir=conf_dirs[0]), shell_escape=False):
+    if not c.run(
+        "ls -A '{conf_dir}'".format(conf_dir=conf_dirs[0]), shell_escape=False
+    ):
         return "hosts_d is empty empty; skipping"
 
     server_names_t = tuple(
@@ -148,7 +152,7 @@ def _nginx_cerbot_setup(
             )
         )
         wwwroot = "/var/www/static/{dns_name}".format(dns_name=dns_name)
-        if exists(wwwroot):
+        if exists(c, runner=c.run, path=wwwroot):
             run_cmd("rm -r '{wwwroot}'".format(wwwroot=wwwroot))
         run_cmd("mkdir -p '{wwwroot}'".format(wwwroot=wwwroot))
         _send_nginx_conf(
@@ -176,8 +180,8 @@ def _nginx_cerbot_setup(
         )
 
     secured_already = (
-        frozenset(run_cmd("ls /etc/letsencrypt/live", warn_only=True).splitlines())
-        if exists("/etc/letsencrypt/live")
+        frozenset(run_cmd("ls /etc/letsencrypt/live", warn=True).splitlines())
+        if exists(c, runner=c.run, path="/etc/letsencrypt/live")
         else tuple()
     )
     cerbot_cmds = tuple(
@@ -192,41 +196,47 @@ def _nginx_cerbot_setup(
         return "You must've already secured all your domains. Otherwise clean: /etc/letsencrypt/live"
 
     service_name = "nginx"
-    if sudo(
-        "systemctl status -q {service_name} --no-pager --full".format(
-            service_name=service_name
-        ),
-        warn_only=True,
-    ).failed:
-        sudo(
+    if (
+        c.sudo(
+            "systemctl status -q {service_name} --no-pager --full".format(
+                service_name=service_name
+            ),
+            warn=True,
+        ).exited
+        != 0
+    ):
+        c.sudo(
             "systemctl start -q {service_name} --no-pager --full".format(
                 service_name=service_name
             )
         )
     else:
-        sudo(
+        c.sudo(
             "systemctl reload -q {service_name} --no-pager --full".format(
                 service_name=service_name
             )
         )
     print("cerbot_cmds =", cerbot_cmds)
     certbot_res = tuple(map(run_cmd, cerbot_cmds))
-    sudo("cp /etc/nginx/sites-disabled/* /etc/nginx/sites-enabled")
+    c.sudo("cp /etc/nginx/sites-disabled/* /etc/nginx/sites-enabled")
 
-    # sudo('rm -r /etc/nginx/sites-disabled')
+    # c.sudo('rm -r /etc/nginx/sites-disabled')
 
     def secure_conf(dns_name, conf_loc, https_header):
         # print 'secure_conf({!r}, {!r})'.format(dns_name, conf_loc)
-        if run_cmd(
-            "grep -Fq 443 {conf_loc}".format(conf_loc=conf_loc), warn_only=True
-        ).failed:
+        if (
+            run_cmd(
+                "grep -Fq 443 {conf_loc}".format(conf_loc=conf_loc), warn=True
+            ).exited
+            != 0
+        ):
             logger.warning(
                 "Skipping {conf_loc}; 443 already found within".format(
                     conf_loc=conf_loc
                 )
             )
         sio = StringIO()
-        get(remote_path=conf_loc, use_sudo=use_sudo, local_path=sio)
+        c.get(remote=conf_loc, use_sudo=use_sudo, local=sio)
         sio.seek(0)
         sio_s = sio.read()
         substr = sio_s[
@@ -247,10 +257,10 @@ def _nginx_cerbot_setup(
         col = sni.rfind(':')
         col = col.format(':') if col > -1 else col"""
 
-        return put(
-            remote_path=conf_loc,
+        return c.put(
+            remote=conf_loc,
             use_sudo=use_sudo,
-            local_path=StringIO(
+            local=StringIO(
                 "{orig}\n\nserver {substr}".format(
                     orig=sio_s,
                     substr=substr.replace(
@@ -276,7 +286,7 @@ def _nginx_cerbot_setup(
         for dns_name, conf_loc in iteritems(hosts_d)
     )
 
-    sudo(
+    c.sudo(
         "systemctl reload -q {service_name} --no-pager --full".format(
             service_name=service_name
         )
@@ -284,8 +294,9 @@ def _nginx_cerbot_setup(
     return {"certbot_res": certbot_res, "replaced_confs": replaced_confs}
 
 
-def _install_upgrade_service(service_name, **kwargs):
+def _install_upgrade_service(c, service_name, **kwargs):
     install_upgrade_service(
+        c,
         service_name,
         conf_local_filepath=kwargs.get("systemd-conf-file"),
         context={
@@ -297,11 +308,11 @@ def _install_upgrade_service(service_name, **kwargs):
             "service_name": service_name,
         },
     )
-    return restart_systemd(service_name)
+    return restart_systemd(c, service_name)
 
 
 def _environment(kwargs):
-    home_dir = run("echo $HOME", quiet=True)
+    home_dir = c.run("echo $HOME", hide=True).stdout.rstrip()
 
     kwargs["WorkingDirectory"] = kwargs["GIT_DIR"]
 
@@ -318,7 +329,7 @@ def _environment(kwargs):
             else "".join(map(str, kwargs["RDBMS_URI"]))
         )
     else:
-        rdbms_uri = run('echo "$RDBMS_URI"')
+        rdbms_uri = c.run('echo "$RDBMS_URI"').stdout.rstrip()
 
     kwargs["Environments"] = (
         "{}\n".format(kwargs["Environments"]) if "Environments" in kwargs else ""
@@ -335,7 +346,7 @@ def _environment(kwargs):
             if not k.startswith("$$")
         )
         if "$$ENV_JSON_FILE" in kwargs["DAEMON_ENV"]:
-            kwargs["Environments"] += "\n" + run(
+            kwargs["Environments"] += "\n" + c.run(
                 """python -c 'import json; f=open("{fname}");{rest}""".format(
                     fname=kwargs["DAEMON_ENV"]["$$ENV_JSON_FILE"],
                     rest='d=json.load(f);print chr(10).join("Environment={q}{k}={v}{q}".format(q=chr(39), k=k, v=v) for k,v in d.iteritems()); f.close()\'',
