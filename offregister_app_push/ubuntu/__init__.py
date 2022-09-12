@@ -3,7 +3,7 @@ from os import path
 from sys import modules, version
 
 from fabric.context_managers import shell_env
-from fabric.contrib.files import append, exists
+from patchwork.files import append, exists
 from offregister_fab_utils.apt import apt_depends
 from offregister_fab_utils.fs import cmd_avail
 from offregister_fab_utils.git import clone_or_update
@@ -128,7 +128,7 @@ def nginx3(**kwargs):
             raise NotImplementedError()
 
         apt_depends(c, "curl", "gnupg2", "ca-certificates", "lsb-release")
-        release = c.run("lsb_release -cs")
+        release = c.run("lsb_release -cs").stdout.rstrip()
         sio.write(
             "deb http://nginx.org/packages/{flavour} {release} nginx".format(
                 flavour=flavour, release=release
@@ -170,6 +170,7 @@ def nginx3(**kwargs):
     deque(
         map(
             lambda dns_name: append(
+                c,
                 text="127.0.0.1\t{site_name}".format(site_name=dns_name),
                 filename="/etc/hosts",
                 use_sudo=True,
