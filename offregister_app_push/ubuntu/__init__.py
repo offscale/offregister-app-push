@@ -3,11 +3,11 @@ from os import path
 from sys import modules, version
 
 from fabric.context_managers import shell_env
-from patchwork.files import append, exists
 from offregister_fab_utils.apt import apt_depends
 from offregister_fab_utils.fs import cmd_avail
 from offregister_fab_utils.git import clone_or_update
 from offregister_fab_utils.ubuntu.systemd import restart_systemd
+from patchwork.files import append, exists
 from pkg_resources import resource_filename
 
 if version[0] == "2":
@@ -190,7 +190,7 @@ def nginx3(**kwargs):
     return restart_systemd("nginx")
 
 
-def nginx_secure4(*args, **kwargs):
+def nginx_secure4(c, *args, **kwargs):
     if "nginx_secure" in kwargs and kwargs["nginx_secure"] is not None:
         if kwargs["nginx_secure"] not in ("certbot", "letsencrypt"):
             raise NotImplementedError(
