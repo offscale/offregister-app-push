@@ -1,4 +1,5 @@
 #!/usr/bin/env python
+# -*- coding: utf-8 -*-
 
 import logging
 from logging.config import dictConfig as _dictConfig
@@ -9,6 +10,7 @@ import yaml
 __author__ = "Samuel Marks"
 __version__ = "0.0.20"
 __description__ = "Deploy Node.JS and static file applications & certbot to install HTTPS certificates (in nginx)."
+
 
 def get_logger(name=None):
     """
